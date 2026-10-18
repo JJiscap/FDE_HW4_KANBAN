@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Literal
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import APIRouter, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from supabase import Client, create_client
@@ -18,6 +18,10 @@ supabase: Client = create_client(
 )
 
 app = FastAPI(title="FDEHW4 API")
+
+# Vercel forwards the original request path to the service (/api/cards stays
+# /api/cards), so every route lives under /api to match the top-level rewrite.
+router = APIRouter(prefix="/api")
 
 app.add_middleware(
     CORSMiddleware,
@@ -46,17 +50,17 @@ def _run(query):
         raise HTTPException(status_code=502, detail=f"Supabase error: {exc}")
 
 
-@app.get("/health")
+@router.get("/health")
 def health():
     return {"status": "ok"}
 
 
-@app.get("/cards")
+@router.get("/cards")
 def get_cards():
     return _run(supabase.table("cards").select("*").order("created_at"))
 
 
-@app.post("/cards", status_code=201)
+@router.post("/cards", status_code=201)
 def create_card(card: CardCreate):
     rows = _run(supabase.table("cards").insert(card.model_dump()))
     if not rows:
@@ -64,7 +68,7 @@ def create_card(card: CardCreate):
     return rows[0]
 
 
-@app.patch("/cards/{card_id}")
+@router.patch("/cards/{card_id}")
 def update_card(card_id: int, card: CardUpdate):
     changes = card.model_dump(exclude_none=True)
     if not changes:
@@ -75,8 +79,11 @@ def update_card(card_id: int, card: CardUpdate):
     return rows[0]
 
 
-@app.delete("/cards/{card_id}", status_code=204)
+@router.delete("/cards/{card_id}", status_code=204)
 def delete_card(card_id: int):
     rows = _run(supabase.table("cards").delete().eq("id", card_id))
     if not rows:
         raise HTTPException(status_code=404, detail="Card not found")
+
+
+app.include_router(router)

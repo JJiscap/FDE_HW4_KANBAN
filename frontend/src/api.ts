@@ -1,6 +1,8 @@
 import type { Card, Status } from './types'
 
-const BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
+// Same-origin by default: Vercel routes /api/* to the backend service.
+// Set VITE_API_URL (e.g. http://localhost:8000/api) to run the frontend against a standalone backend.
+const BASE = import.meta.env.VITE_API_URL ?? '/api'
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
